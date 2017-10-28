@@ -10,7 +10,7 @@ library("stringr")
 install.packages("DataExplorer")
 library(DataExplorer)
 
-source("C:\\work\\projetos\\ie-ds-bootcamp\\R Coding\\my-resources.R")
+# source("C:\\work\\projetos\\ie-ds-bootcamp\\R Coding\\my-resources.R")
 
 # load data
 # check column types
@@ -22,44 +22,53 @@ source("C:\\work\\projetos\\ie-ds-bootcamp\\R Coding\\my-resources.R")
 # query in sql-lite
 # contigency tables
 
-file = fread("C:\\work\\projetos\\ie-ds-bootcamp\\Amadeus\\trips.csv")
+# file = fread("C:\\work\\projetos\\ie-ds-bootcamp\\Amadeus\\trips.csv")
 
-# load a smaller sample
-set.seed(12345) # set the seed so that we all get the same results
-mydata = file[sample(nrow(file), 1000)]
+# # load a smaller sample
+# set.seed(12345) # set the seed so that we all get the same results
+# mydata = file[sample(nrow(file), 1000)]
+# attach(mydata)
+
+# load the merged dataset ~35k rows
+mydata = read.csv("/Users/loftis/ie-ds-bc-group3/data/full_pax_trips_sample.csv", sep=",")
 attach(mydata)
 
 names(mydata)
-# "ArrivalTime"     "BusinessLeisure" "CabinCategory"   "CreationDate"    "CurrencyCode"   
-# "DepartureTime"   "Destination"     "OfficeIdCountry" "Origin"          "TotalAmount"    
-# "nPAX"
+#  "X"               "RecLoc"          "Age"             "Nationality"     "Title"          
+#  "ArrivalTime"     "BusinessLeisure" "CabinCategory"   "CreationDate"    "CurrencyCode"   
+#  "DepartureTime"   "Destination"     "OfficeIdCountry" "Origin"          "TotalAmount"
 
 head(mydata)
 
-# check column types
-print_types(mydata)
+# # check column types
+# print_types(mydata)
 
+mydata$Arrival_date = sapply(ArrivalTime, function(x) strftime(parse_date(x), format="%x"))
 mydata$Arrival_year = sapply(ArrivalTime, function(x) strftime(parse_date(x), format="%Y"))
 mydata$Arrival_month = sapply(ArrivalTime, function(x) strftime(parse_date(x), format="%m"))
 mydata$Arrival_day = sapply(ArrivalTime, function(x) strftime(parse_date(x), format="%d"))
+mydata$Arrival_weekday = sapply(ArrivalTime, function(x) strftime(parse_date(x), format="%A"))
+mydata$Arrival_weekdaynum = sapply(ArrivalTime, function(x) strftime(parse_date(x), format="%w"))
+
+mydata$Departure_date = sapply(DepartureTime, function(x) strftime(parse_date(x), format="%x"))
 
 mydata$Departure_year = sapply(DepartureTime, function(x) strftime(parse_date(x), format="%Y"))
 mydata$Departure_month = sapply(DepartureTime, function(x) strftime(parse_date(x), format="%m"))
 mydata$Departure_day = sapply(DepartureTime, function(x) strftime(parse_date(x), format="%d"))
 
+mydata$Departure_weekday = sapply(DepartureTime, function(x) strftime(parse_date(x), format="%A"))
+mydata$Departure_weekdaynum = sapply(DepartureTime, function(x) strftime(parse_date(x), format="%w"))
 
-"2457211"
+"2457211" "2458054"
 
 julian_to_unix(as.numeric("2457211"))
 
 strftime(parse_date("2457211"), format="%Y")
 
-
 # obtain summary of data:
 GenerateReport(mydata)
 
-get_outliers_iqr(mydata)
-
+get_outliers_iqr(mydata
 
 # columns with missing values: TotalAmount, CurrencyCode, BusinessLeisure
 sum(nchar(BusinessLeisure)==0)
