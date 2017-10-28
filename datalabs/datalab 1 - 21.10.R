@@ -118,3 +118,8 @@ outliers = get_outliers_iqr(mydata)
 # - arrival and departure time - are they effective or expected?
 # - if they're effective can we get the expected times?
 # - creation date - 
+
+
+julian_to_unix <- function(x) {
+  return((x-2440587.5)*86400.0)
+}
