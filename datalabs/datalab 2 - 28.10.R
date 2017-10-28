@@ -17,3 +17,5 @@ names(paula_sample) = c("RecLoc","ArrivalTime","BusinessLeisure","CabinCategory"
 
 
 full_pax_trips_sample.csv
+
+# erics developments
