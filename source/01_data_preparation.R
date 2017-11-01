@@ -15,7 +15,7 @@ names(paula_sample) = c("RecLoc","ArrivalTime","BusinessLeisure","CabinCategory"
 
 
 
-
+# paula's change
 
 
 sample_reclocs = paula_sample$RecLoc
