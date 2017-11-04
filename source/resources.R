@@ -1,6 +1,5 @@
 library(data.table)
 library(dplyr)
-library(tictoc)
 library(stringr)
 
 BASE_FOLDER_NAME = "ie-ds-bc-group3"
@@ -37,6 +36,8 @@ auto_set_wd <- function()
     setwd(data_path)  
   }
 }
+auto_set_wd()
+getwd()
 
 # ivan's tips to have a glimpse of the data
 full_pax_trips_sample = fread("full_pax_trips_sample.csv")
@@ -63,11 +64,63 @@ value_counts <- function(dt)
   return(summ)
 }
 
+# usage example
 summary = value_counts(full_pax_trips_sample)
 summary[1:5] %>% t
 
 View(summary)
 fwrite(summ, "summary_count.csv", sep = ",", dec = ".")
+
+
+# return the names of the columns that contain just numeric values
+getNumericColumns <- function(dataFrame) {
+  
+  if (!is.data.frame(dataFrame))
+  {
+    print("not a data frame")
+    return(NULL)
+  }
+  else {
+    
+    # get the names of the columns into the columns var
+    columns <- names(dataFrame)
+    
+    numeric_cols <- NULL
+    
+    # loop through the columns 
+    for (col in columns)
+    {
+      # check if is numeric
+      if (is.numeric(dataFrame[,col,with=FALSE])) {
+        
+        numeric_cols = c(numeric_cols, col)
+      }
+    }
+    return(numeric_cols)
+    
+  }
+}
+
+# detect outliers using IQR
+get_outliers_iqr = function(df)
+{
+  columns = getNumericColumns(df)  
+  result = NULL
+  
+  for (col in columns)
+  {
+    upper <- quantile(df[,col,with=FALSE])[4] + 1.5*IQR(df[,col,with=FALSE])
+    lower <- quantile(df[,col,with=FALSE])[2] - 1.5*IQR(df[,col,with=FALSE])
+    
+    outliers = sapply(df[,col], function(x) upper < x || x < lower)
+    result = cbind(result, outliers)
+  }
+  
+  # convert the matrix to a dataframe
+  df = as.data.frame(result)
+  names(df) = columns
+  return(df)
+}
 
 
 
