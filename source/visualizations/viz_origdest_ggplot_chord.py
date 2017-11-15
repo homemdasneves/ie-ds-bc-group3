@@ -16,6 +16,8 @@ from bokeh.charts import Chord
 path = "C:\\work\\projetos\\ie-ds-bootcamp\\ie-ds-bc-group3\\data\\"
 data = pd.read_csv(path + "Aug_2017.csv")
 
+aux = data.head(5)
+
 NUM_ORIG_DESTS = 50
 SORT_BY_AVG = "ARR_DELAY"
 
