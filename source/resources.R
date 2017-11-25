@@ -194,6 +194,89 @@ get_correlations = function(df)
 }
 
 
+# 
+getFormula = function (target, predictors)
+{
+  return(as.formula(paste(target,"~",do.call(paste,c(as.list(predictors),sep="+")))))
+}
 
 
+getFormula <- function(target,predictors) {
+  return(as.formula(paste(target,"~",do.call(paste,c(as.list(predictors),sep="+")))))
+}
 
+backwardRSquared <- function(data, target, predictors) {
+  
+  # todo: put this to work with factors (dummies package)
+  # dummies: turns factors into numbers
+  
+  # this is a drawback: we're using only the numeric cols
+  predictors <- predictors[which(sapply(data[,predictors],is.numeric))]
+  
+  while(TRUE) {
+    f <- getFormula(target,predictors)
+    model <- lm(f,data)
+    current <- summary(model)$adj.r.squared
+    
+    # get the Adjusted R-squared values for the removal of all predictors
+    adjrs <- sapply(predictors, function(x)
+      summary(lm(getFormula(target,predictors[-which(predictors == x)]),data))$adj.r.squared
+      )
+    
+    # if we can't improve by removing any of the predictors, return the model
+    if (current > max(adjrs)) {
+      return(model)
+    }
+    
+    # choose to remove the predictor which upon removal will get the max adjusted r sq
+    predictors <- predictors[-which(adjrs == max(adjrs))]
+  }
+}
+
+# Carlos' version - unmodified 
+backwardPValue <- function(data, target, predictors) {
+  
+  predictors <- predictors[which(sapply(data[,predictors],is.numeric))]
+  
+  repeat {
+    f <- getFormula(target,predictors)
+    model <- lm(f,data)
+    pvalues <- summary(model)$coefficients[-1,4]
+    print(summary(model))
+    imax = which(pvalues == max(pvalues))
+    if (pvalues[imax] < 0.05 | length(predictors) == 1) {
+      return(model)
+    }
+    predictors <- predictors[-imax]
+  }
+}
+
+forwardRSquared <- function(data, target, predictors) {
+  
+  predictors <- predictors[which(sapply(data[,predictors],is.numeric))]
+  candidates <- NULL
+  repeat {
+    if (length(candidates) > 0) {
+      f <- getFormula(target,candidates)
+      model <- lm(f,data)
+      current <- summary(model)$adj.r.squared
+    } else {
+      current <- 0
+    }
+    print(paste("Current features: ",do.call(paste,as.list(candidates)), "Adjusted R squared: ",current))
+    adjrs <- sapply(predictors, function(x)
+      summary(lm(getFormula(target,c(candidates,x)),data))$adj.r.squared)
+    if (current > max(adjrs)) {
+      return(model)
+    }
+    imax = which(adjrs == max(adjrs))
+    candidates <- c(candidates,predictors[imax])
+    predictors <- predictors[-imax]
+  }
+}
+
+# by Morane
+statmode=function(x){
+  freq=table(x)
+  names(which(freq==max(freq,na.rm=TRUE)))
+}
