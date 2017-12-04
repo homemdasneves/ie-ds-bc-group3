@@ -1,0 +1,227 @@
+getwd()
+
+library(DataExplorer)
+
+####____________________________EXTRACT DATA____________________________________________
+
+#1. Load all the month files, concatenate and add to a new file called year
+appendDataToCSV <- function(folder, destFile = ""){
+  setwd(folder)
+  entireData <- NULL
+  for (file in list.files(folder)){
+    if(endsWith(file, ".csv")){
+      data <- read.csv(file)
+      entireData <- rbind(entireData, data)
+    }
+  }
+  if(destFile != ""){
+    write.csv(entireData, file = destFile)
+  }
+  return(entireData)
+}
+
+year <- appendDataToCSV("~/DATA SETS", "year.csv")
+
+
+year <- read.csv("year.csv")
+dim(year) #5657121 rows and 29
+
+####_____________________EDA__________________________________________________________
+str(year)
+names(year)
+
+#____________RENAME COLUMNS____________
+
+names(year) <- c("X.1","YEAR", "QUARTER", "MONTH", "DAY_OF_MONTH", 
+                 "DAY_OF_WEEK", "FLIGHT_DATE", "AIRLINE_CODE","AIRLINE_ID","CARRIER", "FLIGHT_NUMBER",
+                 "ORIGIN", "ORIGIN_CITY", "ORIGIN_WORLD_CODE", "DESTINATION", "DESTINATION_CITY",
+                 "DESTINATION_WORLD_CODE", "DEPARTURE_TIME", 
+                 "DEPARTURE_DELAY","DEPARTURE_DELAY_15","DEPARTURE_TIME_BLOCK", "ARRIVAL_TIME", 
+                 "ARRIVAL_DELAY","ARRIVAL_DELAY_15","ARRIVAL_TIME_BLOCK", "CANCELLED", "DIVERTED", "DISTANCE", "X")
+
+names(year)
+str(year)
+
+#____________TREAT MISSING VALUES_______________
+#analyse correlation, compare histograms and distribution and replaced by the median. we havent treated missing values for variables causes of delays 
+
+head(year)
+summary(year)
+table(complete.cases(year))
+
+
+######## MISSSING VALUES
+missingValues <- function(df){
+  dfmissing <- NULL
+  for (col in names(df)){
+    row <- data.frame(variable = col, 
+                      missing_values = sum(!complete.cases(df[col])), 
+                      perc_missing_values = sum(!complete.cases(df[col]))/nrow(df)*100)
+    dfmissing <- rbind(dfmissing, row)
+  }
+  return(dfmissing)
+}
+
+missingValues(year)
+
+#Remove X variable and all empty values
+year$X <- NULL
+year$X.1 <- NULL
+str(year)
+table(complete.cases(year)) #84933 NAs and  5572188 complete cases
+
+# The NAs represent less than 2% so remove
+year <- year[complete.cases(year), ]
+table(complete.cases(year))
+nrow(year) #final number of observations: 5572188
+
+
+
+
+#__________________OUTLIERS__________________________________________________
+
+ 
+boxplot(year$DEPARTURE_TIME) 
+boxplot(year$DEPARTURE_DELAY) #yes 
+boxplot(year$DEPARTURE_DELAY_15)
+
+boxplot(year$ARRIVAL_TIME)
+boxplot(year$ARRIVAL_DELAY) #yes 
+boxplot(year$ARRIVAL_DELAY_15)
+
+boxplot(year$DISTANCE) #yes 
+
+#Using the IQR we see how the threshold is -23 and 25 for departure delay and -39 and 25 for arrival delay
+#Decided to keep them 
+
+
+#__________________SUMMARY STATS AND GENERATE REPORT________________________
+summary(year)
+GenerateReport(year)
+
+
+
+#___________ANALYSE CORRELATIONS and remove highly correlated variables____________________________________________
+
+cormat <- round(cor(year[,sapply(year,is.numeric)]), 2)
+
+library(reshape2)
+melted_cormat <- melt(cormat)
+head(melted_cormat)
+
+library(ggplot2)
+ggplot(data = melted_cormat, aes(x=Var1, y=Var2, fill=value)) + geom_tile()
+
+# Get lower triangle of the correlation matrix
+get_lower_tri<-function(cormat){
+  cormat[upper.tri(cormat)] <- NA
+  return(cormat)
+}
+
+# Get upper triangle of the correlation matrix
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  return(cormat)
+}
+
+upper_tri <- get_upper_tri(cormat)
+upper_tri
+
+# Melt the correlation matrix
+library(reshape2)
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Heatmap
+library(ggplot2)
+ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+ geom_tile(color = "white")+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1,1), space = "Lab", name="Pearson\nCorrelation") + theme_minimal()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, size = 12, hjust = 1))+coord_fixed()
+
+
+reorder_cormat <- function(cormat){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-cormat)/2)
+  hc <- hclust(dd)
+  cormat <-cormat[hc$order, hc$order]
+}
+
+# Reorder the correlation matrix
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+# Melt the correlation matrix
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1))+
+  coord_fixed()
+# Print the heatmap
+print(ggheatmap)
+
+
+ggheatmap + 
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+
+# save corr.png
+
+
+str(year)
+
+
+#variables to remove because of high correlation 
+year$QUARTER <- NULL #cor of 0.97 with month 
+year$DEPARTURE_DELAY <- NULL #cor of 0.96 with arrival delay 
+year$DEPARTURE_DELAY_15 <- NULL #cor of 0.8 with arrival delay 15
+year$CARRIER <- NULL #same info as airline code 
+year$AIRLINE_ID <- NULL #run chi test (mutinformation )
+year$CANCELLED <- NULL #same value accross all data 
+year$DIVERTED <- NULL #same value across all data 
+
+# mutual information between airline_id y carrier
+library(infotheo)
+mutinformation(year$AIRLINE_ID, year$CARRIER)
+chisq.test(year$AIRLINE_ID, year$CARRIER)
+chisq.test(year$AIRLINE_ID, year$DEST_WAC)
+
+
+str(year)
+
+
+#________CHECK TYPE VARIABLES AND FACTORIZE VARIABLES_________________
+
+year$YEAR <- as.factor(year$YEAR)
+year$MONTH <- as.factor(year$MONTH)
+year$DAY_OF_MONTH <- as.factor(year$DAY_OF_MONTH)
+year$DAY_OF_WEEK <- as.factor(year$DAY_OF_WEEK)
+year$ORIGIN_WORLD_CODE <- as.factor(year$ORIGIN_WORLD_CODE)
+year$DESTINATION_WORLD_CODE <- as.factor(year$DESTINATION_WORLD_CODE)
+
+
+write.csv(year, "year_clean.csv")
+
+data <- read.csv("year_clean.csv")
+
+
+data$YEAR <- as.factor(data$YEAR)
+data$MONTH <- as.factor(data$MONTH)
+data$DAY_OF_MONTH <- as.factor(data$DAY_OF_MONTH)
+data$DAY_OF_WEEK <- as.factor(data$DAY_OF_WEEK)
+data$ORIGIN_WORLD_CODE <- as.factor(data$ORIGIN_WORLD_CODE)
+data$DESTINATION_WORLD_CODE <- as.factor(data$DESTINATION_WORLD_CODE)
+
+str(data)
+
