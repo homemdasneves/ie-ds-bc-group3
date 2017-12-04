@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{5c4d4426-200d-4272-b038-7c42451c3e8f}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile />
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId />
+    <InterpreterVersion />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="data\heatmap.jpg" />
+    <Content Include="data\report.html" />
+    <Content Include="decisiontrees\DecisionTree1Attempt.png" />
+    <Content Include="decisiontrees\DecisionTree2Attempt.png" />
+    <Content Include="flights_pablo\index.html" />
+    <Content Include="flights_pablo\lib\globe-binding-0.3.1\globe.js" />
+    <Content Include="flights_pablo\lib\htmlwidgets-0.9\htmlwidgets.js" />
+    <Content Include="flights_pablo\lib\threejs-85\CanvasRenderer.js" />
+    <Content Include="flights_pablo\lib\threejs-85\Detector.js" />
+    <Content Include="flights_pablo\lib\threejs-85\Projector.js" />
+    <Content Include="flights_pablo\lib\threejs-85\StateOrbitControls.js" />
+    <Content Include="flights_pablo\lib\threejs-85\three.min.js" />
+    <Content Include="flights_pablo\lib\threejs-85\TrackballControls.js" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="source\viz_seaborn_heatmap.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="data" />
+    <Folder Include="decisiontrees" />
+    <Folder Include="flights_pablo" />
+    <Folder Include="flights_pablo\lib\" />
+    <Folder Include="flights_pablo\lib\globe-binding-0.3.1" />
+    <Folder Include="flights_pablo\lib\htmlwidgets-0.9" />
+    <Folder Include="flights_pablo\lib\threejs-85" />
+    <Folder Include="source" />
+  </ItemGroup>
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
+</Project>

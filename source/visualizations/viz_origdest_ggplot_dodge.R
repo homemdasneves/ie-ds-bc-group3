@@ -4,10 +4,10 @@ smart_load("data.table")
 
 getwd()
 
-data = fread("Aug_2017.csv")
+data = fread("data/train2.csv")
 str(data)
 names(data)
-head(data)
+data[1:300, .(DEPARTURE_TIME)]
 
 # add orig_dest column
 data$orig_dest = paste(data$ORIGIN, data$DEST, sep="-")

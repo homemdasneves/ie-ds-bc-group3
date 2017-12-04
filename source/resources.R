@@ -7,7 +7,7 @@ DATA_FOLDER_NAME = "data"
 smart_load <- function(pname) 
 {
   print(pname)
-  
+
   if (!is.element(pname, installed.packages()[,1]))
   {
     print("need to install package")
@@ -39,7 +39,7 @@ auto_set_wd <- function()
     setwd(data_path)  
   }
 }
-auto_set_wd()
+#auto_set_wd()
 #getwd()
 
 # ivan's tips to have a glimpse of the data
@@ -173,8 +173,8 @@ get_outliers_iqr = function(df)
     result = cbind(result, outliers)
   }
   
-  # convert the matrix to a dataframe
-  out = as.data.frame(result)
+  # convert the matrix to a datatable
+  out = as.data.table((result))
   names(out) = columns
   return(out)
 }

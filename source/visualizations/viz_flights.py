@@ -10,13 +10,15 @@ import numpy as np
 # https://plot.ly/python/lines-on-maps/
 # https://plot.ly/python/reference/#scattergeo
 
-path = "C:\\work\\projetos\\ie-ds-bootcamp\\ie-ds-bc-group3\\data\\"
+airports_url = "https://raw.githubusercontent.com/homemdasneves/ie-ds-bc-group3/master/data/plotly_airports.csv"
+flights_url = "https://raw.githubusercontent.com/homemdasneves/ie-ds-bc-group3/master/data/plotly_flights.csv"
 
-# 'IATA', 'Latitude', 'Longitude', 'Name', 'City', 'Country'
-airports = pd.read_csv(path + "plotly_airports.csv", encoding = 'utf8')
+airports = pd.read_csv(airports_url, encoding = 'utf8')
+airports.columns # 'IATA', 'Latitude', 'Longitude', 'Name', 'City', 'Country'
+airports.head()
 
-# 'ORIGIN', 'DEST', 'DELAYS', 'ON_TIME', 'FLIGHTS', 'DELAY_RATIO'
-flight_legs = pd.read_csv(path + "plotly_flights.csv", encoding = 'utf8')
+flight_legs = pd.read_csv(flights_url, encoding = 'utf8')
+flights.columns # 'ORIGIN', 'DEST', 'DELAYS', 'ON_TIME', 'FLIGHTS', 'DELAY_RATIO'
 flight_legs = flight_legs.head(800) # get the first 800 only
 
 layout = dict(
@@ -24,7 +26,7 @@ layout = dict(
         showlegend = False,
         geo = dict(
             scope='north america', # "world" | "usa" | "europe" | "asia" | "africa" | "north america" | "south america"
-            projection=dict( type='mercator' ), # "equirectangular" | "mercator" | "orthographic" | "natural earth" | "kavrayskiy7" | "miller" | "robinson" | "eckert4" | "azimuthal equal area" | "azimuthal equidistant" | "conic equal area" | "conic conformal" | "conic equidistant" | "gnomonic" | "stereographic" | "mollweide" | "hammer" | "transverse mercator" | "albers usa" | "winkel tripel" | "aitoff" | "sinusoidal"
+            projection=dict( type='azimuthal equal area' ), # "equirectangular" | "mercator" | "orthographic" | "natural earth" | "kavrayskiy7" | "miller" | "robinson" | "eckert4" | "azimuthal equal area" | "azimuthal equidistant" | "conic equal area" | "conic conformal" | "conic equidistant" | "gnomonic" | "stereographic" | "mollweide" | "hammer" | "transverse mercator" | "albers usa" | "winkel tripel" | "aitoff" | "sinusoidal"
             showland = True,
             landcolor = 'grey', 
             countrycolor = 'white',
@@ -44,7 +46,7 @@ airports_dict = [ dict(
 
 # just the airports
 # step1 = dict( data = airports_dict, layout=layout )
-# plotly.offline.plot(step1, filename='d3-flight-paths' )
+# plotly.offline.plot(step1, filename='plotly_step1' )
 
 flight_paths = []
 for i in range( len( flight_legs ) ):
@@ -66,7 +68,7 @@ for i in range( len( flight_legs ) ):
 
 # the airports and the connections
 step2 = dict( data = airports_dict + flight_paths, layout=layout )
-plotly.offline.plot(step2, filename='d3-flight-paths' )
+plotly.offline.plot(step2, filename='plotly_step2' )
 
 # host it online
 # plotly.tools.set_credentials_file(username='homemdasneves', api_key='wF0KHA0nQPgIGm0Qrqju')

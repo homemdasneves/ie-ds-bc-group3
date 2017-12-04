@@ -1,64 +1,50 @@
+# references:
+# https://www1.ncdc.noaa.gov/pub/data/cdo/documentation/LCD_documentation.pdf
+# https://www.ncdc.noaa.gov/orders/qclcd/
+
+# aux functions
+
+# tries to load a package, installing it if necessary
+smart_load <- function(pname) {
+    print(pname)
+
+    if (!is.element(pname, installed.packages()[, 1])) {
+        print("need to install package")
+        install.packages(pname)
+        require(pname, character.only = TRUE)
+    }
+    else {
+        print("package already installed")
+        require(pname, character.only = TRUE)
+    }
+}
+
 smart_load("ggplot2")
 smart_load("data.table")
 smart_load("lubridate")
 
-# references:
-# https://www1.ncdc.noaa.gov/pub/data/cdo/documentation/LCD_documentation.pdf
-
-getwd()
-
-# aux functions
-is.leapyear=function(year){
-  #http://en.wikipedia.org/wiki/Leap_year
-  return(((year %% 4 == 0) & (year %% 100 != 0)) | (year %% 400 == 0))
-}
-
-num_days = function(year) {
-  if (is.leapyear(year))
-    return(366)
-  else
-    return(365)
-}
-
-noaa_file = "weather/201708hourly.txt"
-clean_weather_data <- function(noaa_file) 
+clean_weather_data <- function(file, our_airports, weather_stations)
 {
-  data = fread(noaa_file)
+    data = fread(file, na.strings = "M") # M represents a missing val
   
-  # associate wban (station id) with iata code (call sign)
-  # we need to join station.txt data
-  station = fread("weather\\201708station.txt")
-  station_filtered = station[,.(WBAN,CallSign,TimeZone)]
+    # perform the join using the merge function
+    # set the ON clause as keys of the tables:
+    setkey(data,WBAN)
+    setkey(weather_stations, WBAN)
+    weather_data <- merge(data, weather_stations, by="WBAN")
   
-
-  # perform the join using the merge function
-  # set the ON clause as keys of the tables:
-  setkey(data,WBAN)
-  setkey(station_filtered,WBAN)
-  weather_data <- merge(data, station_filtered, by="WBAN")
+    # remove unwanted columns
+    weather_data = weather_data[, .(Iata = CallSign, Date, Time, Visibility,
+                                    DryBulbCelsius, DewPointCelsius, RelativeHumidity,
+                                    WindSpeed, Altimeter
+                                    # TODO: use these columns?
+                                    #WeatherType, WeatherTypeFlag 
+    )]
   
-  # remove unwanted columns
-  weather_data = weather_data[,.(Iata = CallSign, Date, Time, Visibility, DryBulbCelsius, 
-                                 DewPointCelsius, RelativeHumidity, WindSpeed, Altimeter
-                                 #WeatherType, WeatherTypeFlag # TODO: use these columns?
-  )]
+    # remove unwanted airports
+    weather_data = weather_data[Iata %in% our_airports]
   
-  # remove unwanted airports
-  flights_data = fread("Aug_2017.csv")
-  our_airports = unique(flights_data$ORIGIN)
-  weather_data = weather_data[Iata %in% our_airports]
-  
-  # in these cols: DewPointCelsius, RelativeHumidity, WindSpeed, Altimeter
-  # M represents a missing value - replace by NA
-  weather_data[DewPointCelsius == "M", DewPointCelsius:=NA]
-  weather_data[RelativeHumidity == "M", RelativeHumidity:=NA]
-  weather_data[WindSpeed == "M", WindSpeed:=NA]
-  weather_data[Altimeter == "M", Altimeter:=NA]
-  weather_data[DryBulbCelsius == "M", DryBulbCelsius:=NA]
-  weather_data[Visibility == "M", Visibility:=NA]
-  weather_data[Iata == "M", Iata:=NA]
-  
-  return(weather_data)
+    return(weather_data)
 }
 
 convertTypes = function(df){
@@ -89,147 +75,131 @@ imputeMissingVals = function(df)
   df[is.na(Altimeter), Altimeter:=AltimeterImp]
 }
 
-folder = "weather"
-output_file = "weather_year.txt"
-# file = "weather/201708hourly.txt"
-# raw_noaa_data = fread(noaa_file)
-# raw_noaa_data[WBAN == 398,.(WBAN, Date, Time)] # first wban of an airport: PSE
 cleanAndBundleWeatherFiles = function(folder, output_file) {
-  bundle = data.table(NULL)
-  filenames = list.files(folder, pattern="*hourly.txt", full.names=TRUE)
-  for (file in filenames) {
-    print(file)
+
+    print("loading flights...")
+    flights_data = fread("data/test.csv")
+    our_airports = unique(flights_data$ORIGIN)
+
+    # associate wban (station id) with iata code (call sign)
+    # we need to join station.txt data
+    print("loading weather stations...")
+    weather_stations = fread("data/weather/201609station.txt")
+    weather_stations = weather_stations[, .(WBAN, CallSign, TimeZone)]
+
+    bundle = data.table(NULL)
+    filenames = list.files(folder, pattern="*hourly.txt", full.names=TRUE)
+    for (file in filenames) {
+
+        print("loading weather file...")
+        print(file)
     
-    clean_data = clean_weather_data(file)
-    bundle = rbind(bundle, clean_data)
-  }
+        clean_data = clean_weather_data(file, our_airports, weather_stations)
+        bundle = rbind(bundle, clean_data)
+    }
   
-  # convert types: Visibility, DryBulbCelsius, DewPointCelsius, RelativeHumidity, WindSpeed, Altimeter
-  convertTypes(bundle)
+    # convert types: Visibility, DryBulbCelsius, DewPointCelsius, RelativeHumidity, WindSpeed, Altimeter
+    print("converting types...")
+    convertTypes(bundle)
   
-  # nearest full hour - for merging
-  bundle[, Hour:= substring(str_pad(Time, 4, pad = "0"), 1, 2)] 
+    # nearest full hour - for merging
+    bundle[, Hour:= substring(str_pad(Time, 4, pad = "0"), 1, 2)] 
   
-  # deal with missing values 
-  # missingCounts = getMissingCounts(bundle) 
-  # missing_visibility_ids = which(is.na(bundle$Visibility))
-  imputeMissingVals(bundle)
-  
-  # prepare for merge: filter out unnecessary columns, and fix formats
-  # final format: iata, date (2017-08-01), hour (2355 -> 23), Visibility, ...
-  write.csv(bundle[,.(Iata, Date, Hour, Visibility, DryBulbCelsius, DewPointCelsius,RelativeHumidity, WindSpeed, Altimeter
+    # deal with missing values 
+    # missingCounts = getMissingCounts(bundle) 
+    # missing_visibility_ids = which(is.na(bundle$Visibility))
+    print("imputing missing vals...")
+    imputeMissingVals(bundle)
+
+    # there are multiple observations in same hour (even tough it should be hourly)
+    # eliminate duplicates
+    weather_no_dupes = bundle[, lapply(.SD, mean), by = .(Iata, Date, Hour)]
+
+    # prepare for merge: filter out unnecessary columns, and fix formats
+    # final format: iata, date (2017-08-01), hour (2355 -> 23), Visibility, ...
+
+    fwrite(
+        weather_no_dupes[, .(Iata, Date, Hour, Visibility, DryBulbCelsius, DewPointCelsius, RelativeHumidity, WindSpeed, Altimeter
                 #WeatherType, WeatherTypeFlag # TODO: use these columns?
                 )], 
-            file = output_file)
+        file = output_file
+        )
+
+    return(weather_no_dupes)
 }
 
+mergeWeatherWithFlights = function(flights_data, weather) {
 
-# cleanup all weather files in the data\weather directory
-# cleanAndBundleWeatherFiles(folder = "weather", output_file = "weather_year.txt")
+    convertTypes(weather)
+    weather[, Hour := substring(str_pad(Hour, 2, pad = "0"), 1, 2)]
+    weather[Hour == "00", Hour := "24"] # replace 00 -> 24
 
-# load a previously cleaned weather file
-weather = fread("weather_year.txt")
-convertTypes(weather)
+    # - create the flight keys 
+    flights_data[, orig_key := paste0(ORIGIN, "|", FLIGHT_DATE, "|", substring(str_pad(DEPARTURE_TIME, 4, pad = "0"), 1, 2))]
+    # adjust for flights that arrive the next day
+    flights_data[, dest_key := paste0(DESTINATION, "|", ifelse((as.integer(ARRIVAL_TIME) < as.integer(DEPARTURE_TIME)),
+                                      as.character(lubridate::ymd(FLIGHT_DATE) + lubridate::days(1)),
+                                      FLIGHT_DATE),
+                               "|", substring(str_pad(ARRIVAL_TIME, 4, pad = "0"), 1, 2))]
+    # check out the new keys
+    t(flights_data[1:3, .(ORIGIN, DESTINATION, FLIGHT_DATE, DEPARTURE_TIME, ARRIVAL_TIME, orig_key, dest_key)])
 
-# merge weather data + flights
+    # setup weather aux datasets
+    weather[, key := paste0(Iata, "|", Date, "|", Hour)]
 
-# - load flights
-flights_year = fread("year_clean.csv")
+    # merge on the origin flights
+    # left join (all.x): keep all flights even if there's no weather match
+    setkeyv(weather, c("key"))
+    setkeyv(flights_data, c("orig_key"))
+    merged_data = merge(x = flights_data, y = weather,
+                    by.x = c("orig_key"), by.y = c("key"),
+                    all.x = TRUE )
 
-# - create the flight keys 
-flights_year[,orig_key:=paste0(FLIGHT_DATE, "|", substring(str_pad(EXPECTED_DEPARTURE_TIME, 4, pad = "0"), 1, 2))]
-# adjust for flights that arrive the next day
-flights_year[,dest_key:=paste0(ifelse((as.integer(EXPECTED_ARRIVAL_TIME) < as.integer(EXPECTED_DEPARTURE_TIME)), 
-                                      as.character(lubridate::ymd(FLIGHT_DATE) + lubridate::days(1)), 
-                                      FLIGHT_DATE), 
-                               "|", substring(str_pad(EXPECTED_ARRIVAL_TIME, 4, pad = "0"), 1, 2))] 
-# check out the new keys
-flights_year[,.(FLIGHT_DATE, EXPECTED_DEPARTURE_TIME, EXPECTED_ARRIVAL_TIME, orig_key, dest_key)]
+    # merge on the destination flights
+    # left join (all.x): keep all flights even if there's no weather match
+    setkeyv(flights_data, c("dest_key"))
+    merged_data = merge(x = merged_data, y = weather,
+                    by.x = c("dest_key"), by.y = c("key"),
+                    suffixes = c("_origin", "_destination"), # if there are name conflicts, use this
+                    all.x = TRUE)
 
-# setup weather aux datasets
-weather_origin = weather[,.(ORIGIN=Iata, 
-                            orig_key=paste0(Date, "|", Hour), 
-                            Orig_Visibility       = Visibility, 
-                            Orig_DryBulbCelsius   = DryBulbCelsius, 
-                            Orig_DewPointCelsius  = DewPointCelsius, 
-                            Orig_RelativeHumidity = RelativeHumidity, 
-                            Orig_WindSpeed        = WindSpeed, 
-                            Orig_Altimeter        = Altimeter)]
-weather_dest = weather[,.(DESTINATION=Iata, 
-                            dest_key=paste0(Date, "|", Hour), 
-                            Dest_Visibility       = Visibility, 
-                            Dest_DryBulbCelsius   = DryBulbCelsius, 
-                            Dest_DewPointCelsius  = DewPointCelsius, 
-                            Dest_RelativeHumidity = RelativeHumidity, 
-                            Dest_WindSpeed        = WindSpeed, 
-                            Dest_Altimeter        = Altimeter)]
+    # getMissingCounts(merged_data)
+}
 
-# merge on the origin flights
-setkeyv(weather_origin, c("ORIGIN", "orig_key"))
-setkeyv(flights_year, c("ORIGIN", "orig_key"))
-merged_data = merge(x = flights_year, 
-                    y = weather_origin, 
-                    by=c("ORIGIN", "orig_key"), 
-                    all.x=TRUE # left join: keep all flights even if there's no weather match
-                    )
-# getMissingCounts(merged_data)
+cut_in_bins = function(x) {
+    bins = 10
+    if (is.numeric(x)) {
+        return(cut(x, bins))
+    }
+    else {
+        return(x)
+    }
+}
 
-# merge on the destination flights
-setkeyv(weather_dest, c("DESTINATION", "dest_key"))
-setkeyv(flights_year, c("DESTINATION", "dest_key"))
-merged_data = merge(x = flights_year, 
-                    y = weather_dest, 
-                    by=c("DESTINATION", "dest_key"), 
-                    all.x=TRUE # left join: keep all flights even if there's no weather match
-                    )
-write.csv(merged_data, file = "flights_and_weather.csv")
+# bundle = cleanAndBundleWeatherFiles(folder = "data/weather", output_file = "data/weather_train.csv")
 
-# TODO - in order of importance: 
-# (2) round flight's departure time to the next full hour (so that it always matches a previous weather observation)
-# (3) adjust for flights arriving in a different timezone (always keeping the localtime)
+flights_data = fread("data/train.csv")
+weather = fread("data/weather_train.csv")
 
-# TODO (maybe...?) 
-# COUNT RECORDS (SHOULD BE 24*NUMDAYS OF YEAR / AIRPORT)
+# checks:
+# weather[, .N, by = .(Iata)][order(-N)] # weather observations per airport (should be 8784)
+# missing_airports = setdiff(unique(flights_data$ORIGIN), unique(weather$Iata)) # 21 airports without weather data
 
-# 3. summary statistics: sd, skew, mean, ...
-# summary is useful but SD's are not included
-# summary(weather_data)
-
-# get SDs for all columns
-# apply(weather_data,2,sd)
-
-# 4. plot data
-# plot(data$Sales)
-# boxplot(data$Sales)
-
-# 5. detect outliers
-# outliers = get_outliers_iqr(weather_data)
-
-# 6. trend
+flights_data[, V1 := NULL] # remove V1 column before merge
+merged_data = mergeWeatherWithFlights(flights_data, weather)
+merged_data_complete = merged_data[complete.cases(merged_data)] # 3% incomplete
+merged_data_complete_factorized = weather[, lapply(.SD, cut_in_bins)]
 
 
+# incompete airports
+# weather[, .N, by = .(Iata)][N < 8784][order(-N)]
 
+# outliers
+# outliers = get_outliers_iqr(weather)
+# outliers[, lapply(.SD, sum)][, lapply(.SD, function(x) return(x / nrow(weather)))]
 
-
-
-
-#weather_data[1:10000, 
-#             .(Iata, 
-#               Date = strftime(parse_date(Date), format="%Y-%m-%d"), 
-#               Time = substring(str_pad(Time, 4, pad = "0"), 1, 2), # round weather observation times to the previous hour
-#               Visibility, DryBulbCelsius, DewPointCelsius,RelativeHumidity, WindSpeed, Altimeter
-#               #WeatherType, WeatherTypeFlag # TODO: use these columns?
-#               )] %>% t
-
-# TODO: merge weather data with departures
-
-
-# TODO: merge weather data with arrivals
-# we should take into account the weather at the destination, by the time of departure :)
-# because while predicting, we don't know what's the weather like in the destinatation at arrival time (future)
-# these calculation should take timezones into consideration
-
-
-
-
-
+# - run the model with and without weather data and compare (c5.0 auto discretizes) 
+# - try discretize by ourselves and compare
+# - try to find weather info for the missing airports (nearby)
+# - ExtraMile: convert weather data in difference from average (test the impact of unusual weather)
+# - adjust for flights arriving in a different timezone (always keeping the localtime)
