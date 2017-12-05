@@ -2,8 +2,15 @@
 # https://www1.ncdc.noaa.gov/pub/data/cdo/documentation/LCD_documentation.pdf
 # https://www.ncdc.noaa.gov/orders/qclcd/
 
-# aux functions
+# Weather Data Dictionary
+# Visibility:  he horizontal distance an object can be seen and identified given in whole miles. 
+# DryBulbCelsius:the dry - bulb temperature and is commonly used as the standard air temperature reported
+# DewPointCelsius:the temperature at which air will condense when in contact with a colder surface than the air. When the temperature is below the freezing point of water, the dew point is called the frost point.
+# RelativeHumidity:relative humidity given to the nearest whole percentage
+# WindSpeed:wind speed in miles per hour
+# Altimeter:Atmospheric pressure reduced to sea level using temperature profile of the “standard” atmosphere. Given in inches of Mercury(in Hg) .
 
+# Aux functions
 # tries to load a package, installing it if necessary
 smart_load <- function(pname) {
     print(pname)
@@ -22,6 +29,7 @@ smart_load <- function(pname) {
 smart_load("ggplot2")
 smart_load("data.table")
 smart_load("lubridate")
+smart_load("stringr")
 
 clean_weather_data <- function(file, our_airports, weather_stations)
 {
@@ -188,8 +196,9 @@ weather = fread("data/weather_train.csv")
 flights_data[, V1 := NULL] # remove V1 column before merge
 merged_data = mergeWeatherWithFlights(flights_data, weather)
 merged_data_complete = merged_data[complete.cases(merged_data)] # 3% incomplete
-merged_data_complete_factorized = weather[, lapply(.SD, cut_in_bins)]
+# merged_data_complete_factorized = weather[, lapply(.SD, cut_in_bins)]
 
+names(merged_data_complete)
 
 # incompete airports
 # weather[, .N, by = .(Iata)][N < 8784][order(-N)]
