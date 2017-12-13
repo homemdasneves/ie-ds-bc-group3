@@ -3,6 +3,10 @@
 # https://www.ncdc.noaa.gov/orders/qclcd/
 
 # Weather Data Dictionary
+# Visibility, Temperature, Dew Point, Relative Humidity, Wind Speed, Atmospheric Pressure
+
+# Simao: vento, temperatura
+
 # Visibility:  he horizontal distance an object can be seen and identified given in whole miles. 
 # DryBulbCelsius:the dry - bulb temperature and is commonly used as the standard air temperature reported
 # DewPointCelsius:the temperature at which air will condense when in contact with a colder surface than the air. When the temperature is below the freezing point of water, the dew point is called the frost point.
@@ -86,7 +90,7 @@ imputeMissingVals = function(df)
 cleanAndBundleWeatherFiles = function(folder, output_file) {
 
     print("loading flights...")
-    flights_data = fread("data/test.csv")
+    flights_data = fread("data/flights_validation.csv")
     our_airports = unique(flights_data$ORIGIN)
 
     # associate wban (station id) with iata code (call sign)
@@ -136,7 +140,9 @@ cleanAndBundleWeatherFiles = function(folder, output_file) {
     return(weather_no_dupes)
 }
 
-mergeWeatherWithFlights = function(flights_data, weather) {
+mergeWeatherWithFlights = function(flights_data, weather, output_file) {
+
+    flights_data[, V1 := NULL] # remove V1 column before merge
 
     convertTypes(weather)
     weather[, Hour := substring(str_pad(Hour, 2, pad = "0"), 1, 2)]
@@ -157,14 +163,16 @@ mergeWeatherWithFlights = function(flights_data, weather) {
 
     # merge on the origin flights
     # left join (all.x): keep all flights even if there's no weather match
+    print("merging origin with weather")
     setkeyv(weather, c("key"))
     setkeyv(flights_data, c("orig_key"))
     merged_data = merge(x = flights_data, y = weather,
                     by.x = c("orig_key"), by.y = c("key"),
-                    all.x = TRUE )
+                    all.x = TRUE)
 
     # merge on the destination flights
     # left join (all.x): keep all flights even if there's no weather match
+    print("merging destination with weather")
     setkeyv(flights_data, c("dest_key"))
     merged_data = merge(x = merged_data, y = weather,
                     by.x = c("dest_key"), by.y = c("key"),
@@ -172,6 +180,27 @@ mergeWeatherWithFlights = function(flights_data, weather) {
                     all.x = TRUE)
 
     # getMissingCounts(merged_data)
+
+    # remove key columns (don't need these anymore)
+    merged_data[, orig_key := NULL]
+    merged_data[, dest_key := NULL]
+    merged_data[, V1 := NULL]
+    merged_data[, Iata_origin := NULL]
+    merged_data[, Date_origin := NULL]
+    merged_data[, Hour_origin := NULL]
+    merged_data[, Iata_destination := NULL]
+    merged_data[, Date_destination := NULL]
+    merged_data[, Hour_destination := NULL]
+
+    # keep only airports with complete weather data
+    cc = complete.cases(merged_data)
+    print(paste(100 * sum(cc) / nrow(merged_data), "% airports with complete weather data in ", output_file))
+    merged_data = merged_data[cc]
+
+    # save file
+    print("saving output_file")
+    fwrite(merged_data, output_file)
+    return(merged_data)
 }
 
 cut_in_bins = function(x) {
@@ -184,21 +213,34 @@ cut_in_bins = function(x) {
     }
 }
 
-# bundle = cleanAndBundleWeatherFiles(folder = "data/weather", output_file = "data/weather_train.csv")
-
-flights_data = fread("data/train.csv")
-weather = fread("data/weather_train.csv")
+# weather_train = cleanAndBundleWeatherFiles(folder = "data/weather/train", output_file = "data/weather_train.csv")
+# weather_validation = cleanAndBundleWeatherFiles(folder = "data/weather/validation", output_file = "data/weather_validation.csv")
+# weather_test = cleanAndBundleWeatherFiles(folder = "data/weather/test", output_file = "data/weather_test.csv")
 
 # checks:
 # weather[, .N, by = .(Iata)][order(-N)] # weather observations per airport (should be 8784)
 # missing_airports = setdiff(unique(flights_data$ORIGIN), unique(weather$Iata)) # 21 airports without weather data
 
-flights_data[, V1 := NULL] # remove V1 column before merge
-merged_data = mergeWeatherWithFlights(flights_data, weather)
-merged_data_complete = merged_data[complete.cases(merged_data)] # 3% incomplete
-# merged_data_complete_factorized = weather[, lapply(.SD, cut_in_bins)]
+flights_data = fread("data/flights_train.csv")
+weather = fread("data/weather_train.csv")
+merged_data = mergeWeatherWithFlights(flights_data, weather, "data/flights_and_weather_train.csv")
 
-names(merged_data_complete)
+
+
+
+#weather_and_flights = fread("data/weather_and_flights_complete.csv")
+#weather_and_flights_factorized = weather[,
+    #lapply(.SD, cut_in_bins),
+    #.SDcols = c(
+        #"Visibility_origin",
+        #"DryBulbCelsius_origin",
+        #"DewPointCelsius_origin",
+        #"RelativeHumidity_origin",
+        #"Visibility_destination", 
+        #"DryBulbCelsius_destination", 
+        #"DewPointCelsius_destination",
+        #"RelativeHumidity_destination"
+        #)]
 
 # incompete airports
 # weather[, .N, by = .(Iata)][N < 8784][order(-N)]
@@ -212,3 +254,4 @@ names(merged_data_complete)
 # - try to find weather info for the missing airports (nearby)
 # - ExtraMile: convert weather data in difference from average (test the impact of unusual weather)
 # - adjust for flights arriving in a different timezone (always keeping the localtime)
+# - use all station files to process the weather data
